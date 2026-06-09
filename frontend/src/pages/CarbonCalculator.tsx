@@ -143,10 +143,11 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {formData.transport.vehicle_type !== "none" && (
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Annual Driving Distance</label>
+                      <label htmlFor="annual_mileage_km" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Annual Driving Distance</label>
                       <span className="text-xs text-brand-400 font-bold">{formData.transport.annual_mileage_km.toLocaleString()} km</span>
                     </div>
                     <input 
+                      id="annual_mileage_km"
                       type="range" 
                       min="0" 
                       max="35000" 
@@ -164,10 +165,11 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Public Transit */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Public Transit (Bus, Train, Subways)</label>
+                    <label htmlFor="public_transit_km" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Public Transit (Bus, Train, Subways)</label>
                     <span className="text-xs text-brand-400 font-bold">{formData.transport.public_transit_km.toLocaleString()} km/year</span>
                   </div>
                   <input 
+                    id="public_transit_km"
                     type="range" 
                     min="0" 
                     max="15000" 
@@ -184,9 +186,10 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Flight Hours Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Short-Haul Flights (&lt; 3 hrs)</label>
+                    <label htmlFor="flight_hours_short_haul" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Short-Haul Flights (&lt; 3 hrs)</label>
                     <div className="relative">
                       <input 
+                        id="flight_hours_short_haul"
                         type="number"
                         min="0"
                         value={formData.transport.flight_hours_short_haul}
@@ -202,9 +205,10 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Long-Haul Flights (&gt; 3 hrs)</label>
+                    <label htmlFor="flight_hours_long_haul" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Long-Haul Flights (&gt; 3 hrs)</label>
                     <div className="relative">
                       <input 
+                        id="flight_hours_long_haul"
                         type="number"
                         min="0"
                         value={formData.transport.flight_hours_long_haul}
@@ -230,11 +234,12 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Electricity */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Electricity Usage (kWh)</label>
+                    <label htmlFor="electricity_kwh_monthly" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Electricity Usage (kWh)</label>
                     <span className="text-xs text-brand-400 font-bold">{formData.energy.electricity_kwh_monthly} kWh</span>
                   </div>
                   <div className="relative">
                     <input 
+                      id="electricity_kwh_monthly"
                       type="range" 
                       min="0" 
                       max="1500" 
@@ -253,11 +258,12 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Gas */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Natural Gas Usage (kWh/Units)</label>
+                    <label htmlFor="gas_kwh_monthly" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Natural Gas Usage (kWh/Units)</label>
                     <span className="text-xs text-brand-400 font-bold">{formData.energy.gas_kwh_monthly} kWh</span>
                   </div>
                   <div className="relative">
                     <input 
+                      id="gas_kwh_monthly"
                       type="range" 
                       min="0" 
                       max="1500" 
@@ -276,10 +282,11 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Renewable Energy Percentage */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Renewable Energy Portion</label>
+                    <label htmlFor="renewable_energy_pct" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Renewable Energy Portion</label>
                     <span className="text-xs text-brand-400 font-bold">{formData.energy.renewable_energy_pct}%</span>
                   </div>
                   <input 
+                    id="renewable_energy_pct"
                     type="range" 
                     min="0" 
                     max="100" 
@@ -348,10 +355,11 @@ export const CarbonCalculator: React.FC<CarbonCalculatorProps> = ({ setCurrentPa
                 {/* Shopping Spend */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Discretionary Shopping Spend</label>
+                    <label htmlFor="monthly_shopping_spend" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Discretionary Shopping Spend</label>
                     <span className="text-xs text-brand-400 font-bold">${formData.consumption.monthly_shopping_spend}</span>
                   </div>
                   <input 
+                    id="monthly_shopping_spend"
                     type="range" 
                     min="0" 
                     max="1500" 

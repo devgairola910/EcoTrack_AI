@@ -228,11 +228,13 @@ export const AIChatAssistant: React.FC = () => {
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               placeholder="Ask your carbon coach a question..."
+              aria-label="Ask your carbon coach a question"
               className="flex-grow bg-dark-950/60 border border-white/10 focus:border-brand-500 rounded-xl px-4 py-3 text-xs sm:text-sm text-dark-100 placeholder-dark-500 outline-none transition focus:ring-1 focus:ring-brand-500"
             />
             <button
               onClick={() => handleSendMessage(input)}
               disabled={isLoading || !input.trim()}
+              aria-label="Send message"
               className="bg-brand-600 hover:bg-brand-500 disabled:bg-dark-900 disabled:text-dark-600 disabled:cursor-not-allowed text-white p-3 rounded-xl transition shadow shadow-brand-600/20 shrink-0"
             >
               <Send className="h-4.5 w-4.5" />

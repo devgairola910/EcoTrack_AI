@@ -439,6 +439,7 @@ export const ActivityTracker: React.FC<ActivityTrackerProps> = () => {
                         onClick={() => handleDeleteActivity(act.id)}
                         className="text-dark-500 hover:text-rose-400 p-1.5 hover:bg-rose-500/10 rounded-lg transition"
                         title="Remove Log"
+                        aria-label="Remove logged activity"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

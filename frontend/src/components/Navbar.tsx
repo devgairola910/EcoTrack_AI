@@ -85,6 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onO
                   onClick={logout}
                   className="p-2 rounded-xl text-dark-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
                   title="Log Out"
+                  aria-label="Log Out"
                 >
                   <LogOut className="h-4.5 w-4.5" />
                 </button>
@@ -112,6 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onO
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="text-dark-300 hover:text-white focus:outline-none"
+              aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
