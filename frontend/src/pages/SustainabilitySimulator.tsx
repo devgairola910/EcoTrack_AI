@@ -85,7 +85,7 @@ export const SustainabilitySimulator: React.FC<SustainabilitySimulatorProps> = (
           onClick={handleReset}
           className="flex items-center space-x-2 text-xs font-semibold px-4 py-2 border border-white/10 hover:border-brand-500/30 hover:bg-brand-500/10 text-dark-300 hover:text-brand-400 rounded-xl transition duration-300 mt-4 md:mt-0"
         >
-          <ResetCcw className="h-4 w-4" />
+          <RotateCcw className="h-4 w-4" />
           <span>Reset to Baseline</span>
         </button>
       </div>
