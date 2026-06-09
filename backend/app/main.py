@@ -26,9 +26,29 @@ from app.api.models import (
     ChatRequest,
     ChatResponse
 )
-from app.services.calculator import calculate_total_emissions
+from app.services.calculator import (
+    calculate_total_emissions,
+    TRANSPORT_FACTORS,
+    DIET_EMISSIONS
+)
 from app.services.assessment import perform_user_assessment, calculate_eco_score, determine_profile_type
 from app.services.recommender import generate_recommendations
+from app.services.database import (
+    init_db,
+    create_user,
+    verify_user,
+    get_user_by_id,
+    add_history_entry,
+    get_user_history,
+    clear_user_history,
+    get_activities,
+    add_activity,
+    delete_activity,
+    clear_activities,
+    get_user_challenges,
+    update_user_challenge_status,
+    clear_user_challenges
+)
 
 app = FastAPI(
     title="EcoTrack AI API",
@@ -309,7 +329,6 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> int:
 
 @app.on_event("startup")
 def startup_event():
-    from app.services.database import init_db
     init_db()
 
 @app.post("/api/auth/signup", response_model=AuthResponse)
@@ -317,7 +336,6 @@ def auth_signup(request: SignupRequest):
     """
     Register a new user account with validated email and password credentials.
     """
-    from app.services.database import create_user
     user_id = create_user(request.email, request.password, request.name)
     if user_id is None:
         raise HTTPException(status_code=400, detail="Email address is already registered")
@@ -332,7 +350,6 @@ def auth_login(request: LoginRequest):
     """
     Authenticate user login credentials and return an active session token.
     """
-    from app.services.database import verify_user
     user = verify_user(request.email, request.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password credentials")
@@ -347,7 +364,6 @@ def get_current_user_profile(user_id: int = Depends(get_current_user_id)):
     """
     Retrieve the profile details of the currently authenticated user.
     """
-    from app.services.database import get_user_by_id
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -358,7 +374,6 @@ def fetch_user_history_logs(user_id: int = Depends(get_current_user_id)):
     """
     Fetch all archived carbon footprint calculation logs for the active user.
     """
-    from app.services.database import get_user_history
     rows = get_user_history(user_id)
     logs = []
     for r in rows:
@@ -382,7 +397,6 @@ def save_user_history_log(request: HistorySaveRequest, user_id: int = Depends(ge
     """
     Save a new carbon footprint calculation snapshot entry to the user's history log.
     """
-    from app.services.database import add_history_entry
     entry_id = add_history_entry(
         user_id,
         request.date,
@@ -397,7 +411,6 @@ def delete_user_history_logs(user_id: int = Depends(get_current_user_id)):
     """
     Delete all footprint calculation log history records for the current user.
     """
-    from app.services.database import clear_user_history
     clear_user_history(user_id)
     return {"status": "success", "message": "History cleared"}
 
@@ -408,7 +421,6 @@ def fetch_user_activities(user_id: int = Depends(get_current_user_id)):
     """
     Retrieve all logged daily carbon-saving activities for the active user.
     """
-    from app.services.database import get_activities
     rows = get_activities(user_id)
     return [
         ActivityResponse(
@@ -425,7 +437,6 @@ def log_user_activity(request: ActivityLogRequest, user_id: int = Depends(get_cu
     """
     Log a new daily eco-friendly action and earn experience points.
     """
-    from app.services.database import add_activity
     act_id = add_activity(
         user_id,
         request.date,
@@ -440,7 +451,6 @@ def delete_user_activity(activity_id: int, user_id: int = Depends(get_current_us
     """
     Delete a specific logged activity by ID.
     """
-    from app.services.database import delete_activity
     delete_activity(user_id, activity_id)
     return {"status": "success"}
 
@@ -449,7 +459,6 @@ def clear_user_activities(user_id: int = Depends(get_current_user_id)):
     """
     Delete all daily activities recorded by the user.
     """
-    from app.services.database import clear_activities
     clear_activities(user_id)
     return {"status": "success"}
 
@@ -460,7 +469,6 @@ def fetch_user_challenges(user_id: int = Depends(get_current_user_id)):
     """
     Retrieve the current status of all weekly eco-challenges for the active user.
     """
-    from app.services.database import get_user_challenges
     rows = get_user_challenges(user_id)
     return [
         ChallengeResponse(
@@ -481,7 +489,6 @@ def update_challenge_status(challenge_id: str, request: ChallengeUpdateRequest, 
     """
     Update the status (available, active, completed) of a weekly challenge.
     """
-    from app.services.database import update_user_challenge_status
     success = update_user_challenge_status(user_id, challenge_id, request.status)
     if not success:
         raise HTTPException(status_code=404, detail="Challenge not found or update failed")
@@ -492,7 +499,6 @@ def clear_challenges(user_id: int = Depends(get_current_user_id)):
     """
     Clear all weekly challenges stored for the user, triggering a reseeding of fresh available ones.
     """
-    from app.services.database import clear_user_challenges
     clear_user_challenges(user_id)
     return {"status": "success", "message": "Challenges cleared"}
 
@@ -544,7 +550,6 @@ def handle_chat_assistant(request: ChatRequest):
         elif any(kw in last_message for kw in ["ev", "electric car", "electric vehicle", "driving", "mileage", "commute", "car"]):
             if vehicle_type in ["petrol", "diesel", "hybrid"]:
                 # calculate potential EV savings
-                from app.services.calculator import TRANSPORT_FACTORS
                 v_factor = TRANSPORT_FACTORS.get(vehicle_type, 0.192)
                 ev_factor = TRANSPORT_FACTORS["electric"]
                 ev_saving = mileage * (v_factor - ev_factor)
@@ -580,7 +585,6 @@ def handle_chat_assistant(request: ChatRequest):
                 f"2. **Retrofit with LEDs** and unplug standby devices to save up to 15% on power consumption instantly. (Unplugging at night completes our 'Power Down' Weekly Challenge for **40 Eco Points**!)."
             )
         elif any(kw in last_message for kw in ["diet", "food", "meat", "vegan", "vegetarian", "beef", "chicken", "eat"]):
-            from app.services.calculator import DIET_EMISSIONS
             current_diet_em = DIET_EMISSIONS.get(diet.lower(), 2500)
             veg_em = DIET_EMISSIONS["vegetarian"]
             saving = current_diet_em - veg_em
