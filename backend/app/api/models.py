@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Optional
 
 class TransportInput(BaseModel):
@@ -79,6 +79,23 @@ class SignupRequest(BaseModel):
         max_length=100,
         description="User full display name"
     )
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """
+        Verify password strength meets complexity guidelines (upper, lower, digit, special character).
+        """
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        special_chars = "!@#$%^&*()-_=+[]{}|;:',.<>?/~`"
+        if not any(c in special_chars for c in v):
+            raise ValueError("Password must contain at least one special character")
+        return v
 
 class LoginRequest(BaseModel):
     email: str = Field(

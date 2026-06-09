@@ -1,8 +1,11 @@
 import base64
+from collections import defaultdict
 import hashlib
 import hmac
 import os
+import time
 from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -68,6 +71,57 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting configuration (e.g., max 100 requests per 60 seconds per IP)
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_REQUESTS = 100
+ip_request_history = defaultdict(list)
+
+# Max payload content size: 2MB (2 * 1024 * 1024 bytes)
+MAX_CONTENT_LENGTH_BYTES = 2 * 1024 * 1024
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Prevent brute-force and Denial-of-Service (DoS) attacks by rate-limiting client IPs.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+    
+    # Filter out timestamps older than the sliding window
+    ip_request_history[client_ip] = [
+        t for t in ip_request_history[client_ip]
+        if current_time - t < RATE_LIMIT_WINDOW_SECONDS
+    ]
+    
+    if len(ip_request_history[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please try again later."}
+        )
+        
+    ip_request_history[client_ip].append(current_time)
+    return await call_next(request)
+
+@app.middleware("http")
+async def payload_size_limit_middleware(request: Request, call_next):
+    """
+    Defend against memory exhaustion (DoS) by enforcing a maximum size on request payloads.
+    """
+    content_length = request.headers.get("Content-Length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_CONTENT_LENGTH_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request payload too large (max 2MB)."}
+                )
+        except ValueError:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid Content-Length header."}
+            )
+    return await call_next(request)
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
