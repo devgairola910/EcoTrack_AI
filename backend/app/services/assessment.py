@@ -7,6 +7,19 @@ from app.services.calculator import calculate_total_emissions
 GLOBAL_AVERAGE_EMISSIONS = 4800.0
 
 def calculate_eco_score(emissions: EmissionBreakdown, request: AssessmentRequest) -> int:
+    """
+    Calculate the user's ecological score on a scale of 1 to 100 based on emissions and habits.
+
+    Uses an exponential decay curve against the emissions total, and grants bonus points
+    for green habits (diet type, renewable energy percentage, recycling, composting).
+
+    Args:
+        emissions (EmissionBreakdown): The calculated emission levels for all categories.
+        request (AssessmentRequest): The original user assessment request containing habit choices.
+
+    Returns:
+        int: An ecological score between 1 and 100 inclusive.
+    """
     total = emissions.total
     
     # Calculate a base score using an exponential decay curve.
@@ -39,6 +52,15 @@ def calculate_eco_score(emissions: EmissionBreakdown, request: AssessmentRequest
     return max(1, min(100, final_score))
 
 def determine_profile_type(total_emissions: float) -> str:
+    """
+    Categorize the user's environmental profile based on total annual CO2e emissions.
+
+    Args:
+        total_emissions (float): Total annual emissions in kg CO2e.
+
+    Returns:
+        str: Category title (e.g., "Eco Champion", "Green Conscious", "Moderate Emitter", "High Carbon Footprint").
+    """
     if total_emissions < 2500.0:
         return "Eco Champion"
     elif total_emissions < 5000.0:
@@ -49,6 +71,18 @@ def determine_profile_type(total_emissions: float) -> str:
         return "High Carbon Footprint"
 
 def perform_user_assessment(request: AssessmentRequest) -> AssessmentResponse:
+    """
+    Evaluate the user's carbon footprint questionnaire inputs to generate a full profile.
+
+    Computes total category-by-category emissions, determines an ecological score,
+    classifies the profile, and compares results against global averages and tree offset metrics.
+
+    Args:
+        request (AssessmentRequest): The multi-category input parameters from the user.
+
+    Returns:
+        AssessmentResponse: Complete assessment breakdown, eco score, and sustainability comparison.
+    """
     emissions = calculate_total_emissions(
         request.transport,
         request.energy,

@@ -26,6 +26,15 @@ DIET_EMISSIONS = {
 }
 
 def calculate_transport_emissions(input_data: TransportInput) -> float:
+    """
+    Calculate annual transportation emissions based on vehicle fuel type, distance, and flight metrics.
+
+    Args:
+        input_data (TransportInput): Pydantic input containing driving distance, vehicle type, transit km, and flight hours.
+
+    Returns:
+        float: Calculated emissions in kg CO2e.
+    """
     vehicle_factor = TRANSPORT_FACTORS.get(input_data.vehicle_type.lower(), 0.0)
     vehicle_emissions = input_data.annual_mileage_km * vehicle_factor
     transit_emissions = input_data.public_transit_km * PUBLIC_TRANSIT_FACTOR
@@ -36,6 +45,15 @@ def calculate_transport_emissions(input_data: TransportInput) -> float:
     return round(vehicle_emissions + transit_emissions + flight_emissions, 2)
 
 def calculate_energy_emissions(input_data: EnergyInput) -> float:
+    """
+    Calculate annual residential utility energy emissions scaling monthly kWh numbers.
+
+    Args:
+        input_data (EnergyInput): Pydantic input containing gas usage, electric consumption, heating oil, and solar generation %.
+
+    Returns:
+        float: Calculated emissions in kg CO2e.
+    """
     # Scale from monthly to annual
     elec_annual = input_data.electricity_kwh_monthly * 12
     gas_annual = input_data.gas_kwh_monthly * 12
@@ -49,6 +67,16 @@ def calculate_energy_emissions(input_data: EnergyInput) -> float:
     return round(elec_emissions + gas_emissions + oil_emissions, 2)
 
 def calculate_diet_emissions(input_data: DietInput, compost_habit: str = "never") -> float:
+    """
+    Calculate annual diet emissions based on food type and composting deductions.
+
+    Args:
+        input_data (DietInput): Pydantic diet details (e.g. vegan, heavy meat).
+        compost_habit (str): Composting frequency ("always", "sometimes", "never").
+
+    Returns:
+        float: Calculated emissions in kg CO2e.
+    """
     base_diet = DIET_EMISSIONS.get(input_data.diet_type.lower(), 2500.0)
     
     # Composting reduces organic food waste impact
@@ -61,6 +89,15 @@ def calculate_diet_emissions(input_data: DietInput, compost_habit: str = "never"
     return round(base_diet * (1.0 - compost_discount), 2)
 
 def calculate_consumption_emissions(input_data: ConsumptionInput) -> float:
+    """
+    Calculate annual consumer goods consumption emissions with recycling deductions.
+
+    Args:
+        input_data (ConsumptionInput): Pydantic purchases spend and recycling frequency details.
+
+    Returns:
+        float: Calculated emissions in kg CO2e.
+    """
     # Standard translation: $1 monthly spend = ~1.44 kg CO2e per year (0.12 kg/month)
     base_emissions = input_data.monthly_shopping_spend * 12 * 0.12
     
@@ -79,6 +116,18 @@ def calculate_total_emissions(
     diet: DietInput,
     consumption: ConsumptionInput
 ) -> EmissionBreakdown:
+    """
+    Calculate total carbon footprint footprint breakdown from all sub-categories.
+
+    Args:
+        transport (TransportInput): Transportation details.
+        energy (EnergyInput): Utilities details.
+        diet (DietInput): Diet selection details.
+        consumption (ConsumptionInput): Shopping habits details.
+
+    Returns:
+        EmissionBreakdown: Sub-category emissions and grand total value.
+    """
     t_em = calculate_transport_emissions(transport)
     e_em = calculate_energy_emissions(energy)
     d_em = calculate_diet_emissions(diet, consumption.compost_habits)

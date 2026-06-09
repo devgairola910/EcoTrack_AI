@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import os
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
@@ -37,7 +38,11 @@ app = FastAPI(
 # Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify the exact domains
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        os.getenv("PRODUCTION_DOMAIN", "https://eco-track-ai-devgairola910s-projects.vercel.app")
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -211,7 +216,7 @@ def run_simulation(request: SimulationRequest):
 
 # --- AUTHENTICATION & HISTORY INTEGRATION ---
 
-SECRET_KEY = "ecotrack_ai_secret_signature_key_salt_token"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ecotrack_ai_secret_signature_key_salt_token")
 
 def generate_auth_token(user_id: int, email: str) -> str:
     payload = f"{user_id}:{email}"
