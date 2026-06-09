@@ -1,7 +1,8 @@
 import base64
 import hashlib
+import hmac
 import os
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -48,6 +49,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """
+    HTTP middleware to append defense-in-depth security headers to every response.
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Allow local/production assets while preventing injection framing
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' https://cdn.jsdelivr.net; "
+        "frame-ancestors 'none';"
+    )
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 class ScoreRequest(BaseModel):
     emissions: EmissionBreakdown
     assessment: AssessmentRequest
@@ -63,10 +81,16 @@ class SimulationResponse(BaseModel):
 
 @app.get("/")
 def read_root():
+    """
+    Get the API service status.
+    """
     return {"status": "online", "message": "EcoTrack AI Backend Service is running."}
 
 @app.post("/api/calculate", response_model=EmissionBreakdown)
 def calculate_footprint(request: AssessmentRequest):
+    """
+    Calculate the carbon footprint footprint breakdown (Transport, Energy, Diet, Consumption).
+    """
     try:
         emissions = calculate_total_emissions(
             request.transport,
@@ -80,6 +104,9 @@ def calculate_footprint(request: AssessmentRequest):
 
 @app.post("/api/assessment", response_model=AssessmentResponse)
 def get_user_assessment(request: AssessmentRequest):
+    """
+    Evaluate the carbon footprint inputs to return emissions, scores, profiles, and equivalents.
+    """
     try:
         assessment = perform_user_assessment(request)
         return assessment
@@ -88,6 +115,9 @@ def get_user_assessment(request: AssessmentRequest):
 
 @app.post("/api/score")
 def get_eco_score(request: ScoreRequest):
+    """
+    Calculate the ecological rating score (1-100) based on emissions and habits.
+    """
     try:
         score = calculate_eco_score(request.emissions, request.assessment)
         return {"eco_score": score}
@@ -219,12 +249,35 @@ def run_simulation(request: SimulationRequest):
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ecotrack_ai_secret_signature_key_salt_token")
 
 def generate_auth_token(user_id: int, email: str) -> str:
+    """
+    Generate a cryptographically secure signed authentication token.
+
+    Uses HMAC-SHA256 signature to guarantee payload integrity and prevent length-extension attacks.
+
+    Args:
+        user_id (int): Primary key ID of the user.
+        email (str): Email of the authenticated session.
+
+    Returns:
+        str: Base64-encoded token containing the payload and signature.
+    """
     payload = f"{user_id}:{email}"
-    sig = hashlib.sha256((payload + SECRET_KEY).encode("utf-8")).hexdigest()
+    sig = hmac.new(SECRET_KEY.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
     token_str = f"{payload}:{sig}"
     return base64.b64encode(token_str.encode("utf-8")).decode("utf-8")
 
 def verify_auth_token(token: str) -> Optional[int]:
+    """
+    Verify the cryptographically signed token and extract the user ID.
+
+    Employs constant-time string comparison to defend against timing analysis side channels.
+
+    Args:
+        token (str): Base64-encoded token from headers.
+
+    Returns:
+        Optional[int]: User ID if valid, or None if expired/tampered with.
+    """
     try:
         token_str = base64.b64decode(token.encode("utf-8")).decode("utf-8")
         parts = token_str.split(":")
@@ -232,8 +285,8 @@ def verify_auth_token(token: str) -> Optional[int]:
             return None
         user_id, email, sig = parts[0], parts[1], parts[2]
         payload = f"{user_id}:{email}"
-        expected_sig = hashlib.sha256((payload + SECRET_KEY).encode("utf-8")).hexdigest()
-        if sig == expected_sig:
+        expected_sig = hmac.new(SECRET_KEY.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(sig.encode("utf-8"), expected_sig.encode("utf-8")):
             return int(user_id)
     except Exception:
         pass

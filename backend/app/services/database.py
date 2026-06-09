@@ -2,17 +2,31 @@ import sqlite3
 import os
 import hashlib
 import json
+import secrets
 from typing import Optional, List, Dict, Any
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ecotrack.db")
 
-def get_db_connection():
-    # SQLite is lightweight, simple, and requires zero setup
+def get_db_connection() -> sqlite3.Connection:
+    """
+    Establish a connection to the SQLite database.
+
+    Configures the connection to return sqlite3.Row rows for dictionary access.
+
+    Returns:
+        sqlite3.Connection: Database connection object.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
+def init_db() -> None:
+    """
+    Initialize the SQLite database schema.
+
+    Creates users, history, activities, and user_challenges tables if they
+    do not already exist.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -74,9 +88,72 @@ def init_db():
     conn.close()
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    """
+    Hash a user's password using PBKDF2-HMAC-SHA256 with a unique random salt.
+
+    Generates a 16-byte hex-encoded salt and derives the key over 100,000 iterations.
+    Returns the string format 'salt:derived_key_hex'.
+
+    Args:
+        password (str): Plain text password input.
+
+    Returns:
+        str: Salt and key pair separated by a colon.
+    """
+    salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000
+    )
+    return f"{salt}:{key.hex()}"
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    """
+    Verify a user's password against a stored PBKDF2-HMAC-SHA256 or legacy SHA-256 hash.
+
+    Utilizes constant-time verification to prevent timing attacks.
+
+    Args:
+        password (str): Plain text password input.
+        hashed_password (str): Stored hash from the database.
+
+    Returns:
+        bool: True if password matches, False otherwise.
+    """
+    try:
+        if ":" not in hashed_password:
+            # Fallback compatibility for legacy SHA-256 hashes
+            old_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+            return secrets.compare_digest(old_hash.encode("utf-8"), hashed_password.encode("utf-8"))
+            
+        salt, key_hex = hashed_password.split(":", 1)
+        expected_key = bytes.fromhex(key_hex)
+        key = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            salt.encode('utf-8'),
+            100000
+        )
+        return secrets.compare_digest(key, expected_key)
+    except Exception:
+        return False
 
 def create_user(email: str, password: str, name: str) -> Optional[int]:
+    """
+    Register a new user in the database.
+
+    Secures the password using PBKDF2-HMAC-SHA256 before insertion.
+
+    Args:
+        email (str): The user's unique email.
+        password (str): Plain text password.
+        name (str): Display name of the user.
+
+    Returns:
+        Optional[int]: The inserted user ID, or None if the email already exists.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -89,25 +166,46 @@ def create_user(email: str, password: str, name: str) -> Optional[int]:
         user_id = cursor.lastrowid
         return user_id
     except sqlite3.IntegrityError:
-        return None # Email already exists
+        return None  # Email already exists
     finally:
         conn.close()
 
 def verify_user(email: str, password: str) -> Optional[Dict[str, Any]]:
+    """
+    Authenticate a user using their email and password credentials.
+
+    Args:
+        email (str): The login email address.
+        password (str): Plain text password credentials.
+
+    Returns:
+        Optional[Dict[str, Any]]: User profile details (id, email, name) if authenticated, else None.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
-    pw_hash = hash_password(password)
     cursor.execute(
-        "SELECT id, email, name FROM users WHERE email = ? AND password_hash = ?",
-        (email.lower(), pw_hash)
+        "SELECT id, email, name, password_hash FROM users WHERE email = ?",
+        (email.lower(),)
     )
     row = cursor.fetchone()
     conn.close()
     if row:
-        return dict(row)
+        row_dict = dict(row)
+        stored_hash = row_dict.pop("password_hash")
+        if verify_password(password, stored_hash):
+            return row_dict
     return None
 
 def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve user record details by user primary key ID.
+
+    Args:
+        user_id (int): The unique user ID.
+
+    Returns:
+        Optional[Dict[str, Any]]: User profile info if found, else None.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,))
@@ -118,6 +216,19 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     return None
 
 def add_history_entry(user_id: int, date: str, total_emissions: float, eco_score: int, raw_input: Dict[str, Any]) -> int:
+    """
+    Save a carbon footprint calculation assessment entry to the database.
+
+    Args:
+        user_id (int): ID of the user saving the log.
+        date (str): ISO date string.
+        total_emissions (float): Calculated CO2e emissions in kg.
+        eco_score (int): Calculated ecological rating.
+        raw_input (Dict[str, Any]): Full parameters dict from the questionnaire.
+
+    Returns:
+        int: The inserted history row entry ID.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     raw_input_str = json.dumps(raw_input)
@@ -131,6 +242,15 @@ def add_history_entry(user_id: int, date: str, total_emissions: float, eco_score
     return entry_id
 
 def get_user_history(user_id: int) -> List[Dict[str, Any]]:
+    """
+    Retrieve all historical assessment logs associated with a user.
+
+    Args:
+        user_id (int): ID of the user.
+
+    Returns:
+        List[Dict[str, Any]]: Log entries with deserialized questionnaire inputs.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -147,16 +267,33 @@ def get_user_history(user_id: int) -> List[Dict[str, Any]]:
         entries.append(d)
     return entries
 
-def clear_user_history(user_id: int):
+def clear_user_history(user_id: int) -> None:
+    """
+    Delete all footprint assessment log entries associated with a user.
+
+    Args:
+        user_id (int): ID of the user.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
 
-# --- ACTIVITY LOGGER OPERATIONS ---
-
 def add_activity(user_id: int, date: str, action_id: str, points: int, co2_saved: float) -> int:
+    """
+    Record a completed daily carbon reduction action.
+
+    Args:
+        user_id (int): ID of the user.
+        date (str): ISO date string.
+        action_id (str): Reference string of the logger action.
+        points (int): Eco experience points earned.
+        co2_saved (float): Mass in kg CO2e saved by this specific action.
+
+    Returns:
+        int: The inserted activity logger row ID.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -169,6 +306,15 @@ def add_activity(user_id: int, date: str, action_id: str, points: int, co2_saved
     return act_id
 
 def get_activities(user_id: int) -> List[Dict[str, Any]]:
+    """
+    Retrieve chronological daily activity logs logged by a user.
+
+    Args:
+        user_id (int): ID of the user.
+
+    Returns:
+        List[Dict[str, Any]]: List of recorded activities.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -179,23 +325,45 @@ def get_activities(user_id: int) -> List[Dict[str, Any]]:
     conn.close()
     return [dict(r) for r in rows]
 
-def delete_activity(user_id: int, activity_id: int):
+def delete_activity(user_id: int, activity_id: int) -> None:
+    """
+    Remove a specific daily action log from a user's logs.
+
+    Args:
+        user_id (int): ID of the user.
+        activity_id (int): Primary key ID of the activity entry.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM activities WHERE user_id = ? AND id = ?", (user_id, activity_id))
     conn.commit()
     conn.close()
 
-def clear_activities(user_id: int):
+def clear_activities(user_id: int) -> None:
+    """
+    Clear all logged activities of a user.
+
+    Args:
+        user_id (int): ID of the user.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM activities WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
 
-# --- WEEKLY CHALLENGES OPERATIONS ---
-
 def get_user_challenges(user_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch the list of weekly eco-challenges for a user.
+
+    If challenges do not exist, seeds the user table with default challenge entries.
+
+    Args:
+        user_id (int): ID of the user.
+
+    Returns:
+        List[Dict[str, Any]]: List of challenges and progress details.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -233,6 +401,20 @@ def get_user_challenges(user_id: int) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 def update_user_challenge_status(user_id: int, challenge_id: str, status: str, completed_date: Optional[str] = None) -> bool:
+    """
+    Modify the progress status of a weekly challenge for a user.
+
+    Handles default timestamp assignment for activations and completions.
+
+    Args:
+        user_id (int): ID of the user.
+        challenge_id (str): Unique identifier of the challenge (e.g. 'pedal_power').
+        status (str): New status ('available', 'active', 'completed').
+        completed_date (Optional[str]): Explicit completion date string.
+
+    Returns:
+        bool: True if database row was successfully updated, False otherwise.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -271,7 +453,13 @@ def update_user_challenge_status(user_id: int, challenge_id: str, status: str, c
     conn.close()
     return rows_affected > 0
 
-def clear_user_challenges(user_id: int):
+def clear_user_challenges(user_id: int) -> None:
+    """
+    Remove all weekly challenge entries associated with a user.
+
+    Args:
+        user_id (int): ID of the user.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM user_challenges WHERE user_id = ?", (user_id,))

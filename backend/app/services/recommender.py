@@ -10,6 +10,19 @@ from app.services.calculator import (
 )
 
 def generate_recommendations(request: AssessmentRequest) -> List[Recommendation]:
+    """
+    Generate personalized carbon reduction recommendations based on user assessment inputs.
+
+    Analyzes transportation driving mileage, aviation flights, home utility profiles,
+    dietary choices, and recycling habits to recommend the highest-impact actions.
+    Recommendations are sorted in descending order of annual CO2e savings.
+
+    Args:
+        request (AssessmentRequest): User input questionnaire parameters.
+
+    Returns:
+        List[Recommendation]: List of personalized and calculated carbon offset actions.
+    """
     recs = []
     
     # Calculate emissions per category to customize calculations

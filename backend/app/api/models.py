@@ -60,13 +60,40 @@ class SimulationRequest(BaseModel):
     custom_adjustments: Optional[dict] = None
 
 class SignupRequest(BaseModel):
-    email: str
-    password: str
-    name: str
+    email: str = Field(
+        ...,
+        min_length=3,
+        max_length=255,
+        pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",
+        description="Unique user email address"
+    )
+    password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+        description="User password (min 6 characters)"
+    )
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="User full display name"
+    )
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(
+        ...,
+        min_length=3,
+        max_length=255,
+        pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",
+        description="User email address"
+    )
+    password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+        description="User password credentials"
+    )
 
 class UserResponse(BaseModel):
     id: int
