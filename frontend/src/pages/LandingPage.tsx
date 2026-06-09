@@ -58,11 +58,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setCurrentPage }) => {
           </div>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl font-display leading-[1.15]">
-            Decarbonize Your Life with <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-emerald-300">Actionable AI</span>
+            Gamify Your Green Journey with <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-emerald-300">Eco Intelligence</span>
           </h1>
 
           <p className="text-lg text-dark-300 leading-relaxed max-w-2xl mx-auto">
-            Calculate your carbon footprint, simulate lifestyle changes in real-time, and adopt custom, high-impact suggestions tailored to your environment.
+            Unlock eco-levels, track daily action streaks, complete weekly sustainability challenges, and coach with AI to reach Paris Climate Agreement targets.
           </p>
 
           <div className="flex items-center justify-center gap-x-6">
