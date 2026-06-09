@@ -132,10 +132,11 @@ export const SustainabilitySimulator: React.FC<SustainabilitySimulatorProps> = (
             {vehicleType !== "none" && (
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Annual Driving</span>
+                  <label htmlFor="sim_mileage" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Annual Driving</label>
                   <span className="text-xs text-amber-400 font-bold">{mileage.toLocaleString()} km</span>
                 </div>
                 <input 
+                  id="sim_mileage"
                   type="range"
                   min="0"
                   max="35000"
@@ -157,10 +158,11 @@ export const SustainabilitySimulator: React.FC<SustainabilitySimulatorProps> = (
             
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Renewable Power Grid Portion</span>
+                <label htmlFor="sim_renewable" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Renewable Power Grid Portion</label>
                 <span className="text-xs text-orange-400 font-bold">{renewablePct}%</span>
               </div>
               <input 
+                id="sim_renewable"
                 type="range"
                 min="0"
                 max="100"
@@ -214,10 +216,11 @@ export const SustainabilitySimulator: React.FC<SustainabilitySimulatorProps> = (
             {/* Shopping Spend */}
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Spend</span>
+                <label htmlFor="sim_shopping" className="text-xs text-dark-300 font-semibold uppercase tracking-wider">Monthly Spend</label>
                 <span className="text-xs text-purple-400 font-bold">${shoppingSpend}</span>
               </div>
               <input 
+                id="sim_shopping"
                 type="range"
                 min="0"
                 max="1500"

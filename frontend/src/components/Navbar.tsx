@@ -34,15 +34,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onO
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div 
-            className="flex cursor-pointer items-center space-x-2 text-brand-400"
+          <button 
+            className="flex items-center space-x-2 text-brand-400 focus:outline-none"
             onClick={() => setCurrentPage("landing")}
+            aria-label="EcoTrack AI Homepage"
           >
             <Leaf className="h-7 w-7 animate-pulse-slow" />
             <span className="font-semibold text-xl tracking-tight text-white font-display">
               EcoTrack<span className="text-brand-500 font-extrabold">AI</span>
             </span>
-          </div>
+          </button>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
@@ -69,14 +70,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onO
             {user ? (
               <div className="flex items-center space-x-3 animate-fade-in">
                 {isCalculated && assessmentResult && (
-                  <div 
+                  <button 
                     onClick={() => setCurrentPage("dashboard")}
-                    className="flex items-center space-x-1.5 cursor-pointer bg-dark-900 border border-brand-500/20 hover:border-brand-500/40 rounded-full px-3 py-1.5 transition-all duration-300"
+                    className="flex items-center space-x-1.5 bg-dark-900 border border-brand-500/20 hover:border-brand-500/40 rounded-full px-3 py-1.5 transition-all duration-300 focus:outline-none"
+                    aria-label={`View Dashboard. Current Eco Score is ${assessmentResult.eco_score}`}
                   >
                     <Award className="h-4 w-4 text-brand-400" />
                     <span className="text-xs text-dark-300">Score:</span>
                     <span className="text-sm font-bold text-brand-400">{assessmentResult.eco_score}</span>
-                  </div>
+                  </button>
                 )}
                 <div className="text-xs text-dark-300 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
                   Hi, <span className="font-semibold text-white">{user.name.split(" ")[0]}</span>
