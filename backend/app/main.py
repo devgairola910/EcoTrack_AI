@@ -126,6 +126,9 @@ def get_eco_score(request: ScoreRequest):
 
 @app.post("/api/recommendations", response_model=RecommendationResponse)
 def get_recommendations(request: AssessmentRequest):
+    """
+    Get customized carbon offset actions tailored to the user's questionnaire parameters.
+    """
     try:
         recs = generate_recommendations(request)
         return RecommendationResponse(recommendations=recs)
@@ -134,6 +137,9 @@ def get_recommendations(request: AssessmentRequest):
 
 @app.post("/api/simulate", response_model=SimulationResponse)
 def run_simulation(request: SimulationRequest):
+    """
+    Simulate lifestyle carbon reductions based on custom inputs and adopted actions.
+    """
     try:
         # Calculate base values
         original_assessment = perform_user_assessment(request.current_assessment)
@@ -308,6 +314,9 @@ def startup_event():
 
 @app.post("/api/auth/signup", response_model=AuthResponse)
 def auth_signup(request: SignupRequest):
+    """
+    Register a new user account with validated email and password credentials.
+    """
     from app.services.database import create_user
     user_id = create_user(request.email, request.password, request.name)
     if user_id is None:
@@ -320,6 +329,9 @@ def auth_signup(request: SignupRequest):
 
 @app.post("/api/auth/login", response_model=AuthResponse)
 def auth_login(request: LoginRequest):
+    """
+    Authenticate user login credentials and return an active session token.
+    """
     from app.services.database import verify_user
     user = verify_user(request.email, request.password)
     if user is None:
@@ -332,6 +344,9 @@ def auth_login(request: LoginRequest):
 
 @app.get("/api/auth/me", response_model=UserResponse)
 def get_current_user_profile(user_id: int = Depends(get_current_user_id)):
+    """
+    Retrieve the profile details of the currently authenticated user.
+    """
     from app.services.database import get_user_by_id
     user = get_user_by_id(user_id)
     if not user:
@@ -340,6 +355,9 @@ def get_current_user_profile(user_id: int = Depends(get_current_user_id)):
 
 @app.get("/api/user/history", response_model=List[HistoryLogEntry])
 def fetch_user_history_logs(user_id: int = Depends(get_current_user_id)):
+    """
+    Fetch all archived carbon footprint calculation logs for the active user.
+    """
     from app.services.database import get_user_history
     rows = get_user_history(user_id)
     logs = []
@@ -361,6 +379,9 @@ class HistorySaveRequest(BaseModel):
 
 @app.post("/api/user/history")
 def save_user_history_log(request: HistorySaveRequest, user_id: int = Depends(get_current_user_id)):
+    """
+    Save a new carbon footprint calculation snapshot entry to the user's history log.
+    """
     from app.services.database import add_history_entry
     entry_id = add_history_entry(
         user_id,
@@ -373,6 +394,9 @@ def save_user_history_log(request: HistorySaveRequest, user_id: int = Depends(ge
 
 @app.delete("/api/user/history")
 def delete_user_history_logs(user_id: int = Depends(get_current_user_id)):
+    """
+    Delete all footprint calculation log history records for the current user.
+    """
     from app.services.database import clear_user_history
     clear_user_history(user_id)
     return {"status": "success", "message": "History cleared"}
@@ -381,6 +405,9 @@ def delete_user_history_logs(user_id: int = Depends(get_current_user_id)):
 
 @app.get("/api/user/activities", response_model=List[ActivityResponse])
 def fetch_user_activities(user_id: int = Depends(get_current_user_id)):
+    """
+    Retrieve all logged daily carbon-saving activities for the active user.
+    """
     from app.services.database import get_activities
     rows = get_activities(user_id)
     return [
@@ -395,6 +422,9 @@ def fetch_user_activities(user_id: int = Depends(get_current_user_id)):
 
 @app.post("/api/user/activities")
 def log_user_activity(request: ActivityLogRequest, user_id: int = Depends(get_current_user_id)):
+    """
+    Log a new daily eco-friendly action and earn experience points.
+    """
     from app.services.database import add_activity
     act_id = add_activity(
         user_id,
@@ -407,12 +437,18 @@ def log_user_activity(request: ActivityLogRequest, user_id: int = Depends(get_cu
 
 @app.delete("/api/user/activities/{activity_id}")
 def delete_user_activity(activity_id: int, user_id: int = Depends(get_current_user_id)):
+    """
+    Delete a specific logged activity by ID.
+    """
     from app.services.database import delete_activity
     delete_activity(user_id, activity_id)
     return {"status": "success"}
 
 @app.delete("/api/user/activities")
 def clear_user_activities(user_id: int = Depends(get_current_user_id)):
+    """
+    Delete all daily activities recorded by the user.
+    """
     from app.services.database import clear_activities
     clear_activities(user_id)
     return {"status": "success"}
@@ -421,6 +457,9 @@ def clear_user_activities(user_id: int = Depends(get_current_user_id)):
 
 @app.get("/api/user/challenges", response_model=List[ChallengeResponse])
 def fetch_user_challenges(user_id: int = Depends(get_current_user_id)):
+    """
+    Retrieve the current status of all weekly eco-challenges for the active user.
+    """
     from app.services.database import get_user_challenges
     rows = get_user_challenges(user_id)
     return [
@@ -439,6 +478,9 @@ def fetch_user_challenges(user_id: int = Depends(get_current_user_id)):
 
 @app.put("/api/user/challenges/{challenge_id}")
 def update_challenge_status(challenge_id: str, request: ChallengeUpdateRequest, user_id: int = Depends(get_current_user_id)):
+    """
+    Update the status (available, active, completed) of a weekly challenge.
+    """
     from app.services.database import update_user_challenge_status
     success = update_user_challenge_status(user_id, challenge_id, request.status)
     if not success:
@@ -447,6 +489,9 @@ def update_challenge_status(challenge_id: str, request: ChallengeUpdateRequest, 
 
 @app.delete("/api/user/challenges")
 def clear_challenges(user_id: int = Depends(get_current_user_id)):
+    """
+    Clear all weekly challenges stored for the user, triggering a reseeding of fresh available ones.
+    """
     from app.services.database import clear_user_challenges
     clear_user_challenges(user_id)
     return {"status": "success", "message": "Challenges cleared"}
@@ -455,6 +500,9 @@ def clear_challenges(user_id: int = Depends(get_current_user_id)):
 
 @app.post("/api/chat", response_model=ChatResponse)
 def handle_chat_assistant(request: ChatRequest):
+    """
+    Handle carbon coaching conversational queries context-sensitively based on user carbon footprint metrics.
+    """
     try:
         if not request.messages:
             return ChatResponse(reply="Hello! I am your EcoTrack carbon coach. How can I help you today?")
