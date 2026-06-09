@@ -83,3 +83,16 @@ class HistoryLogEntry(BaseModel):
     total_emissions: float
     eco_score: int
     raw_input: AssessmentRequest
+
+class ActivityLogRequest(BaseModel):
+    action_id: str
+    points: int
+    co2_saved: float
+    date: str
+
+class ActivityResponse(BaseModel):
+    id: int
+    date: str
+    action_id: str
+    points: int
+    co2_saved: float

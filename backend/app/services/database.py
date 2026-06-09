@@ -38,6 +38,19 @@ def init_db():
         FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
+
+    # Create Activities table for daily logging
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS activities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        action_id TEXT NOT NULL,
+        points INTEGER NOT NULL,
+        co2_saved REAL NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
     
     conn.commit()
     conn.close()
@@ -120,5 +133,44 @@ def clear_user_history(user_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+# --- ACTIVITY LOGGER OPERATIONS ---
+
+def add_activity(user_id: int, date: str, action_id: str, points: int, co2_saved: float) -> int:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO activities (user_id, date, action_id, points, co2_saved) VALUES (?, ?, ?, ?, ?)",
+        (user_id, date, action_id, points, co2_saved)
+    )
+    conn.commit()
+    act_id = cursor.lastrowid
+    conn.close()
+    return act_id
+
+def get_activities(user_id: int) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, date, action_id, points, co2_saved FROM activities WHERE user_id = ? ORDER BY id DESC",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def delete_activity(user_id: int, activity_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM activities WHERE user_id = ? AND id = ?", (user_id, activity_id))
+    conn.commit()
+    conn.close()
+
+def clear_activities(user_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM activities WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
