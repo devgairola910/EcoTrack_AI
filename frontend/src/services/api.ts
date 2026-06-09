@@ -99,6 +99,11 @@ export interface ChallengeResponse {
   completed_date?: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 // Local Fallback Calculations (in case backend is not running)
 const TRANSPORT_FACTORS: Record<string, number> = {
   petrol: 0.192,
@@ -704,6 +709,111 @@ export const api = {
     } catch (err) {
       console.warn("Backend unavailable, challenges cleared locally only:", err);
       localStorage.removeItem("ecotrack_challenges");
+    }
+  },
+
+  async sendChatMessage(
+    messages: ChatMessage[],
+    assessment?: AssessmentInput | null,
+    token?: string | null
+  ): Promise<string> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ messages, assessment })
+      });
+      if (!response.ok) throw new Error("Chat assistant backend error");
+      const data = await response.json();
+      return data.reply;
+    } catch (err) {
+      console.warn("Backend chat endpoint unavailable, using local mock assistant logic:", err);
+      if (messages.length === 0) {
+        return "Hello! I am your EcoTrack carbon coach. How can I help you today?";
+      }
+
+      const lastMsg = messages[messages.length - 1].content.toLowerCase();
+
+      // Fallback base values
+      let vehicleType = "petrol";
+      let mileage = 8000;
+      let electricity = 320;
+      let diet = "average_meat";
+      let totalCO2 = 5200;
+      let ecoScore = 65;
+      let profile = "Moderate Emitter";
+
+      // If assessment is passed, perform local calculation
+      if (assessment) {
+        try {
+          const em = calculateLocalEmissions(assessment);
+          totalCO2 = em.total;
+          ecoScore = calculateLocalScore(em, assessment);
+          profile = getLocalProfile(em.total);
+
+          vehicleType = assessment.transport.vehicle_type;
+          mileage = assessment.transport.annual_mileage_km;
+          electricity = assessment.energy.electricity_kwh_monthly;
+          diet = assessment.diet.diet_type;
+        } catch (calcErr) {
+          console.error("Local calculation failed inside chat fallback:", calcErr);
+        }
+      }
+
+      // Local matching logic
+      if (/\b(hello|hi|hey|greetings)\b/.test(lastMsg)) {
+        return `Hello! I'm your EcoTrack AI Coach. 🌍\n\nBased on your profile, your total annual footprint is **${Math.round(totalCO2)} kg CO2e**, placing you in the **${profile}** category (Eco Score: **${ecoScore}/100**).\n\nWhat would you like to discuss today? You can ask me about transportation tips, renewable energy, dietary adjustments, or how to claim points in the Activity Tracker!`;
+      }
+      
+      if (/\b(ev|electric car|electric vehicle|driving|mileage|commute|car)\b/.test(lastMsg)) {
+        if (["petrol", "diesel", "hybrid"].includes(vehicleType)) {
+          const factor = TRANSPORT_FACTORS[vehicleType] || 0.192;
+          const evFactor = TRANSPORT_FACTORS.electric;
+          const evSaving = mileage * (factor - evFactor);
+
+          return `Let's look at your transportation commute! 🚗\n\nYou are currently driving a **${vehicleType}** vehicle with an annual mileage of **${Math.round(mileage)} km**, which releases approximately **${Math.round(mileage * factor)} kg CO2e** per year.\n\n💡 **Recommendation**: If you transitioned to an **Electric Vehicle**, your emissions for the same distance would drop to only **${Math.round(mileage * evFactor)} kg CO2e** (saving you **${Math.round(evSaving)} kg CO2e** annually!).\n\nAdditionally, using public transit just one day a week or walking/cycling for short errands can earn you up to **15 Eco Points** in our Activity Tracker!`;
+        } else {
+          return `Awesome commute habits! 🚲\n\nYour vehicle profile is registered as **${vehicleType}**, which keeps your transport footprint low. Remember that active transport (cycling, walking) has a **0.0 kg CO2** footprint and earns you **15 Eco Points** daily. Let me know if you want to discuss public transit options or flight emissions!`;
+        }
+      }
+
+      if (/\b(flight|plane|fly|aviation|travel)\b/.test(lastMsg)) {
+        return `Air travel has a massive warming impact on the atmosphere due to high-altitude radiative forcing. ✈️\n\nEvery hour on a short-haul flight adds ~150 kg CO2e, and a long-haul flight adds ~110 kg CO2e per passenger.\n\n💡 **Coach Advice**: Consider choosing train routes for medium distances, combining business trips, or committing to our **Reduce Air Travel by 1/3** recommendation to help protect the global carbon budget.`;
+      }
+
+      if (/\b(solar|electricity|power|renewable|energy|led)\b/.test(lastMsg)) {
+        const annualElectricityEm = (electricity * 12) * 0.475;
+        return `Home energy accounts for a major chunk of residential emissions. ⚡\n\nYour profile indicates a monthly electricity usage of **${Math.round(electricity)} kWh**, which accounts for about **${Math.round(annualElectricityEm)} kg CO2e** per year (before accounting for solar generation offset).\n\n💡 **Action Plan**:\n1. **Install Solar Panels** or purchase 100% green power from your utility provider to zero out this footprint.\n2. **Retrofit with LEDs** and unplug standby devices to save up to 15% on power consumption instantly. (Unplugging at night completes our 'Power Down' Weekly Challenge for **40 Eco Points**!).`;
+      }
+
+      if (/\b(diet|food|meat|vegan|vegetarian|beef|chicken|eat)\b/.test(lastMsg)) {
+        const currentDietEm = DIET_EMISSIONS[diet.toLowerCase()] || 2500;
+        const vegEm = DIET_EMISSIONS.vegetarian;
+        const saving = currentDietEm - vegEm;
+
+        if (["heavy_meat", "average_meat"].includes(diet)) {
+          return `Food choice is one of the most effective personal levers for carbon reduction! 🍔\n\nYour diet is registered as **${diet.replace("_", " ")}**, generating about **${Math.round(currentDietEm)} kg CO2e** annually due to high-emission farming practices (especially beef and dairy).\n\n💡 **Switch Impact**: Transitioning to a **vegetarian diet** would lower your annual emissions to **${Math.round(vegEm)} kg CO2e**, saving you **${Math.round(saving)} kg CO2e**!\n\nTry starting with our **Meatless Mondays** challenge (earns **12 Eco Points** in the Activity Tracker) to ease into plant-based habits.`;
+        } else {
+          return `Excellent green food choices! 🥗\n\nYour registered diet is **${diet}**, which is already highly sustainable. Plant-based diets use up to 70% less clean water and land compared to meat-heavy diets.\n\nTo make your kitchen even greener, start composting organic food waste to earn **6 Eco Points** daily and prevent anaerobic methane decay in landfills!`;
+        }
+      }
+
+      if (/\b(recycle|waste|plastic|compost|garbage|trash)\b/.test(lastMsg)) {
+        return `Managing household waste prevents greenhouse emissions in two ways: avoiding manufacturing raw materials, and preventing landfill methane. ♻️\n\n💡 **Green Habits**:\n- **Recycle rigorously**: Plastics, glass, and cardboard take up to 90% less energy to recycle than extracting raw inputs.\n- **Composting kitchen scraps**: Prevents food rotting into methane. It cuts landfill volume and creates rich soil. Doing this regularly completes our 'Zero-Waste Hero' challenge!`;
+      }
+
+      if (/\b(paris|budget|target|limit|world|safety)\b/.test(lastMsg)) {
+        return `Under the international **Paris Agreement**, climate scientists target keeping global temperature increases below 1.5°C. 🌡️\n\nTo achieve this, the average personal carbon budget must drop to under **2,000 kg (2.0 Tons) CO2e** per year. Currently, the average person in high-income countries releases over 10,000 kg.\n\nYour current footprint is **${Math.round(totalCO2)} kg CO2e**, which is ${Math.round((totalCO2 / 2000) * 100)}% of the target safety budget. Use the **Sustainability Simulator** to adjust your inputs and see how you can reach the 2,000 kg safety line!`;
+      }
+
+      if (/\b(score|points|level|challenge|tracker)\b/.test(lastMsg)) {
+        return `EcoTrack AI rewards green actions through our gamified points system! 🏆\n\nYour profile has an Eco Score of **${ecoScore}/100**. You can increase this by:\n1. **Adopting Recommendations** in the recommendations feed (slashes annual footprint estimates).\n2. **Logging Daily Actions** in the Activity Tracker (earns Eco Points, e.g., biking commuted gives **15 pts**).\n3. **Completing Weekly Challenges** (earns massive points, e.g., 'Pedal Power' gives **80 pts**).\n\nAccumulating points increases your Player Level (Novice -> Ally -> Champion -> Sentinel -> Overlord)!`;
+      }
+
+      return `I'm here to support your green journey! 🌍\n\nYour current Eco Score is **${ecoScore}/100** with a footprint of **${Math.round(totalCO2)} kg CO2e/year**.\n\nAsk me questions like:\n- *'How can I lower my car emissions?'*\n- *'What diet choices save the most carbon?'*\n- *'Why is composting important?'*\n- *'What is the Paris Agreement safety budget?'*`;
     }
   }
 };

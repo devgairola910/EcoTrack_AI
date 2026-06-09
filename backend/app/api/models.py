@@ -110,3 +110,14 @@ class ChallengeResponse(BaseModel):
 
 class ChallengeUpdateRequest(BaseModel):
     status: str
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    assessment: Optional[AssessmentRequest] = None
+
+class ChatResponse(BaseModel):
+    reply: str

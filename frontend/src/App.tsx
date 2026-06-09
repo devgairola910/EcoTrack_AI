@@ -9,6 +9,7 @@ import { SustainabilitySimulator } from "./pages/SustainabilitySimulator";
 import { Recommendations } from "./pages/Recommendations";
 import { ActivityTracker } from "./pages/ActivityTracker";
 import { WeeklyChallenges } from "./pages/WeeklyChallenges";
+import { AIChatAssistant } from "./pages/AIChatAssistant";
 import { AuthModal } from "./components/AuthModal";
 
 const AppContent: React.FC = () => {
@@ -46,6 +47,9 @@ const AppContent: React.FC = () => {
         )}
         {currentPage === "challenges" && (
           <WeeklyChallenges setCurrentPage={setCurrentPage} />
+        )}
+        {currentPage === "chat" && (
+          <AIChatAssistant />
         )}
       </main>
 

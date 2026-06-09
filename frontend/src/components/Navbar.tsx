@@ -18,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onO
     { id: "dashboard", label: "Dashboard", disabled: !isCalculated },
     { id: "tracker", label: "Activity Tracker", disabled: !isCalculated },
     { id: "challenges", label: "Weekly Challenges", disabled: !isCalculated },
+    { id: "chat", label: "AI Coach", disabled: !isCalculated },
     { id: "simulator", label: "Simulator", disabled: !isCalculated },
     { id: "recommendations", label: "Action recommendations", disabled: !isCalculated }
   ];
