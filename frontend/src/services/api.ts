@@ -1,6 +1,8 @@
 // EcoTrack AI Frontend API Service with local fallback logic
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+  ? "http://127.0.0.1:8000"
+  : "/_/backend";
 
 export interface TransportInput {
   vehicle_type: string;
