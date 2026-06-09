@@ -20,12 +20,17 @@ interface EcoContextType {
   adoptedRecommendations: string[];
   simulationResult: SimulationResponse | null;
   history: HistoryEntry[];
+  token: string | null;
+  user: { id: number; email: string; name: string } | null;
   isCalculated: boolean;
   isLoading: boolean;
   calculate: (input: AssessmentInput) => Promise<void>;
   toggleRecommendation: (id: string) => Promise<void>;
   updateSimulationWithAdjustments: (adjustments: Record<string, any>) => Promise<void>;
   resetData: () => void;
+  signup: (input: Record<string, string>) => Promise<void>;
+  login: (input: Record<string, string>) => Promise<void>;
+  logout: () => void;
 }
 
 const defaultInput: AssessmentInput = {
@@ -80,6 +85,13 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem("ecotrack_history");
     return saved ? JSON.parse(saved) : [];
   });
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem("ecotrack_token");
+  });
+  const [user, setUser] = useState<{ id: number; email: string; name: string } | null>(() => {
+    const saved = localStorage.getItem("ecotrack_user");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [isCalculated, setIsCalculated] = useState<boolean>(() => {
     return localStorage.getItem("ecotrack_calculated") === "true";
   });
@@ -93,7 +105,29 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem("ecotrack_recs", JSON.stringify(recommendations));
     localStorage.setItem("ecotrack_adopted", JSON.stringify(adoptedRecommendations));
     localStorage.setItem("ecotrack_history", JSON.stringify(history));
-  }, [assessmentInput, assessmentResult, recommendations, adoptedRecommendations, isCalculated, history]);
+    if (token) localStorage.setItem("ecotrack_token", token);
+    else localStorage.removeItem("ecotrack_token");
+    if (user) localStorage.setItem("ecotrack_user", JSON.stringify(user));
+    else localStorage.removeItem("ecotrack_user");
+  }, [assessmentInput, assessmentResult, recommendations, adoptedRecommendations, isCalculated, history, token, user]);
+
+  // Load history from database when authenticated
+  useEffect(() => {
+    if (token) {
+      api.fetchHistory(token)
+        .then((dbHistory) => {
+          if (dbHistory && dbHistory.length > 0) {
+            const localHistory: HistoryEntry[] = dbHistory.map(entry => ({
+              date: entry.date,
+              total_emissions: entry.total_emissions,
+              eco_score: entry.eco_score
+            }));
+            setHistory(localHistory);
+          }
+        })
+        .catch(err => console.error("Error loading database history:", err));
+    }
+  }, [token]);
 
   // Compute live simulation when adopted recommendations change
   useEffect(() => {
@@ -157,6 +191,16 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
       setHistory(newHistory);
+
+      // Save to database if logged in
+      if (token) {
+        api.saveHistory(token, {
+          date: todayStr,
+          total_emissions: currentEmissionsKg,
+          eco_score: currentScore,
+          raw_input: input
+        }).catch(err => console.error("Database save failed:", err));
+      }
       
       setIsCalculated(true);
       setAdoptedRecommendations([]); // Reset adopted choices on new calculation
@@ -191,7 +235,50 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await updateSimulation(adoptedRecommendations, adjustments);
   };
 
+  const signup = async (input: Record<string, string>) => {
+    setIsLoading(true);
+    try {
+      const res = await api.signup(input);
+      setToken(res.token);
+      setUser(res.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (input: Record<string, string>) => {
+    setIsLoading(true);
+    try {
+      const res = await api.login(input);
+      setToken(res.token);
+      setUser(res.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    setHistory([]);
+    setIsCalculated(false);
+    setAssessmentResult(null);
+    setRecommendations([]);
+    setAdoptedRecommendations([]);
+    setSimulationResult(null);
+    localStorage.removeItem("ecotrack_token");
+    localStorage.removeItem("ecotrack_user");
+    localStorage.removeItem("ecotrack_history");
+    localStorage.removeItem("ecotrack_result");
+    localStorage.removeItem("ecotrack_recs");
+    localStorage.removeItem("ecotrack_adopted");
+    localStorage.removeItem("ecotrack_calculated");
+  };
+
   const resetData = () => {
+    if (token) {
+      api.clearHistory(token).catch(err => console.error("Database clear failed:", err));
+    }
     setAssessmentInput(defaultInput);
     setAssessmentResult(null);
     setRecommendations([]);
@@ -199,7 +286,11 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSimulationResult(null);
     setHistory([]);
     setIsCalculated(false);
-    localStorage.clear();
+    localStorage.removeItem("ecotrack_history");
+    localStorage.removeItem("ecotrack_result");
+    localStorage.removeItem("ecotrack_recs");
+    localStorage.removeItem("ecotrack_adopted");
+    localStorage.removeItem("ecotrack_calculated");
   };
 
   return (
@@ -211,12 +302,17 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adoptedRecommendations,
         simulationResult,
         history,
+        token,
+        user,
         isCalculated,
         isLoading,
         calculate,
         toggleRecommendation,
         updateSimulationWithAdjustments,
-        resetData
+        resetData,
+        signup,
+        login,
+        logout
       }}
     >
       {children}

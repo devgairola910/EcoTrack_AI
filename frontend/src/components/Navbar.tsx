@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import { Leaf, Menu, X, Award } from "lucide-react";
+import { Leaf, Menu, X, Award, LogOut } from "lucide-react";
 import { useEco } from "../context/EcoContext";
 
 interface NavbarProps {
   currentPage: string;
   setCurrentPage: (page: string) => void;
+  onOpenAuth: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage }) => {
-  const { isCalculated, assessmentResult } = useEco();
+export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage, onOpenAuth }) => {
+  const { isCalculated, assessmentResult, user, logout } = useEco();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -60,24 +61,46 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage }) =
             ))}
           </div>
 
-          {/* User Score Badge or Assessment Pending */}
+          {/* Desktop User Section */}
           <div className="hidden md:flex items-center space-x-4">
-            {isCalculated && assessmentResult ? (
-              <div 
-                onClick={() => setCurrentPage("dashboard")}
-                className="flex items-center space-x-2 cursor-pointer bg-dark-900 border border-brand-500/20 hover:border-brand-500/40 rounded-full px-4 py-1.5 transition-all duration-300"
-              >
-                <Award className="h-4 w-4 text-brand-400" />
-                <span className="text-xs text-dark-300">Eco Score:</span>
-                <span className="text-sm font-bold text-brand-400">{assessmentResult.eco_score}</span>
+            {user ? (
+              <div className="flex items-center space-x-3 animate-fade-in">
+                {isCalculated && assessmentResult && (
+                  <div 
+                    onClick={() => setCurrentPage("dashboard")}
+                    className="flex items-center space-x-1.5 cursor-pointer bg-dark-900 border border-brand-500/20 hover:border-brand-500/40 rounded-full px-3 py-1.5 transition-all duration-300"
+                  >
+                    <Award className="h-4 w-4 text-brand-400" />
+                    <span className="text-xs text-dark-300">Score:</span>
+                    <span className="text-sm font-bold text-brand-400">{assessmentResult.eco_score}</span>
+                  </div>
+                )}
+                <div className="text-xs text-dark-300 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                  Hi, <span className="font-semibold text-white">{user.name.split(" ")[0]}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 rounded-xl text-dark-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                  title="Log Out"
+                >
+                  <LogOut className="h-4.5 w-4.5" />
+                </button>
               </div>
             ) : (
-              <button
-                onClick={() => setCurrentPage("calculator")}
-                className="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2 rounded-xl text-xs font-semibold tracking-wide shadow-lg shadow-brand-600/25 transition-all duration-300 hover:scale-[1.02]"
-              >
-                Start Assessment
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={onOpenAuth}
+                  className="text-dark-300 hover:text-white text-xs font-bold px-4.5 py-2.5 border border-white/10 rounded-xl hover:bg-white/5 transition duration-300"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => setCurrentPage("calculator")}
+                  className="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-lg shadow-brand-600/25 transition-all duration-300 hover:scale-[1.02]"
+                >
+                  Assessment
+                </button>
+              </div>
             )}
           </div>
 
@@ -112,16 +135,38 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, setCurrentPage }) =
               {item.label}
             </button>
           ))}
-          {!isCalculated && (
-            <div className="pt-2 px-4">
-              <button
-                onClick={() => handleNavClick("calculator")}
-                className="w-full bg-brand-600 hover:bg-brand-500 text-white py-3 rounded-xl text-center text-sm font-bold shadow-lg shadow-brand-600/20"
-              >
-                Start Carbon Assessment
-              </button>
-            </div>
-          )}
+          
+          <div className="pt-4 border-t border-white/5 px-4 space-y-2">
+            {user ? (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-dark-300">
+                  Logged in as <strong className="text-white">{user.name}</strong>
+                </span>
+                <button
+                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  className="flex items-center space-x-1 text-xs text-rose-400 font-bold"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { onOpenAuth(); setMobileMenuOpen(false); }}
+                  className="w-full text-center border border-white/10 hover:bg-white/5 text-white py-2.5 rounded-xl text-sm font-bold"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => { setCurrentPage("calculator"); setMobileMenuOpen(false); }}
+                  className="w-full bg-brand-600 hover:bg-brand-500 text-white py-2.5 rounded-xl text-center text-sm font-bold shadow"
+                >
+                  Assessment
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </nav>

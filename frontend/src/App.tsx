@@ -7,14 +7,20 @@ import { CarbonCalculator } from "./pages/CarbonCalculator";
 import { Dashboard } from "./pages/Dashboard";
 import { SustainabilitySimulator } from "./pages/SustainabilitySimulator";
 import { Recommendations } from "./pages/Recommendations";
+import { AuthModal } from "./components/AuthModal";
 
 const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>("landing");
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-dark-950 text-dark-100 font-sans selection:bg-brand-500 selection:text-white">
       {/* Dynamic Navigation Header */}
-      <Navbar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <Navbar 
+        currentPage={currentPage} 
+        setCurrentPage={setCurrentPage} 
+        onOpenAuth={() => setAuthModalOpen(true)} 
+      />
 
       {/* Main Pages Switchboard */}
       <main className="flex-grow">
@@ -37,6 +43,12 @@ const AppContent: React.FC = () => {
 
       {/* Shared Footer */}
       <Footer />
+
+      {/* Authentication Modal */}
+      <AuthModal 
+        isOpen={authModalOpen} 
+        onClose={() => setAuthModalOpen(false)} 
+      />
     </div>
   );
 };

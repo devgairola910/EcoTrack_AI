@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+import base64
+import hashlib
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -8,7 +10,12 @@ from app.api.models import (
     AssessmentResponse,
     EmissionBreakdown,
     RecommendationResponse,
-    SimulationRequest
+    SimulationRequest,
+    SignupRequest,
+    LoginRequest,
+    AuthResponse,
+    UserResponse,
+    HistoryLogEntry
 )
 from app.services.calculator import calculate_total_emissions
 from app.services.assessment import perform_user_assessment, calculate_eco_score, determine_profile_type
@@ -194,3 +201,114 @@ def run_simulation(request: SimulationRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# --- AUTHENTICATION & HISTORY INTEGRATION ---
+
+SECRET_KEY = "ecotrack_ai_secret_signature_key_salt_token"
+
+def generate_auth_token(user_id: int, email: str) -> str:
+    payload = f"{user_id}:{email}"
+    sig = hashlib.sha256((payload + SECRET_KEY).encode("utf-8")).hexdigest()
+    token_str = f"{payload}:{sig}"
+    return base64.b64encode(token_str.encode("utf-8")).decode("utf-8")
+
+def verify_auth_token(token: str) -> Optional[int]:
+    try:
+        token_str = base64.b64decode(token.encode("utf-8")).decode("utf-8")
+        parts = token_str.split(":")
+        if len(parts) != 3:
+            return None
+        user_id, email, sig = parts[0], parts[1], parts[2]
+        payload = f"{user_id}:{email}"
+        expected_sig = hashlib.sha256((payload + SECRET_KEY).encode("utf-8")).hexdigest()
+        if sig == expected_sig:
+            return int(user_id)
+    except Exception:
+        pass
+    return None
+
+def get_current_user_id(authorization: Optional[str] = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authentication token")
+    token = authorization.split(" ")[1]
+    user_id = verify_auth_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Session expired or invalid signature")
+    return user_id
+
+@app.on_event("startup")
+def startup_event():
+    from app.services.database import init_db
+    init_db()
+
+@app.post("/api/auth/signup", response_model=AuthResponse)
+def auth_signup(request: SignupRequest):
+    from app.services.database import create_user
+    user_id = create_user(request.email, request.password, request.name)
+    if user_id is None:
+        raise HTTPException(status_code=400, detail="Email address is already registered")
+    token = generate_auth_token(user_id, request.email)
+    return AuthResponse(
+        token=token,
+        user=UserResponse(id=user_id, email=request.email, name=request.name)
+    )
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def auth_login(request: LoginRequest):
+    from app.services.database import verify_user
+    user = verify_user(request.email, request.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password credentials")
+    token = generate_auth_token(user["id"], user["email"])
+    return AuthResponse(
+        token=token,
+        user=UserResponse(id=user["id"], email=user["email"], name=user["name"])
+    )
+
+@app.get("/api/auth/me", response_model=UserResponse)
+def get_current_user_profile(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import get_user_by_id
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(id=user["id"], email=user["email"], name=user["name"])
+
+@app.get("/api/user/history", response_model=List[HistoryLogEntry])
+def fetch_user_history_logs(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import get_user_history
+    rows = get_user_history(user_id)
+    logs = []
+    for r in rows:
+        logs.append(HistoryLogEntry(
+            id=r["id"],
+            date=r["date"],
+            total_emissions=r["total_emissions"],
+            eco_score=r["eco_score"],
+            raw_input=AssessmentRequest(**r["raw_input"])
+        ))
+    return logs
+
+class HistorySaveRequest(BaseModel):
+    date: str
+    total_emissions: float
+    eco_score: int
+    raw_input: AssessmentRequest
+
+@app.post("/api/user/history")
+def save_user_history_log(request: HistorySaveRequest, user_id: int = Depends(get_current_user_id)):
+    from app.services.database import add_history_entry
+    entry_id = add_history_entry(
+        user_id,
+        request.date,
+        request.total_emissions,
+        request.eco_score,
+        request.raw_input.model_dump()
+    )
+    return {"status": "success", "entry_id": entry_id}
+
+@app.delete("/api/user/history")
+def delete_user_history_logs(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import clear_user_history
+    clear_user_history(user_id)
+    return {"status": "success", "message": "History cleared"}
+

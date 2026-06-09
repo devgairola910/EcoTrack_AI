@@ -455,5 +455,102 @@ export const api = {
         new_profile_type: getLocalProfile(simEmissions.total)
       };
     }
+  },
+
+  async signup(input: Record<string, string>): Promise<{ token: string; user: { id: number; email: string; name: string } }> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Signup failed");
+      }
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, using local mock signup:", err);
+      // Local signup simulation
+      const users = JSON.parse(localStorage.getItem("mock_users") || "[]");
+      if (users.some((u: any) => u.email === input.email)) {
+        throw new Error("Email address is already registered");
+      }
+      const newUser = { id: Date.now(), email: input.email, name: input.name, password: input.password };
+      users.push(newUser);
+      localStorage.setItem("mock_users", JSON.stringify(users));
+      
+      const token = btoa(`${newUser.id}:${newUser.email}`);
+      return {
+        token,
+        user: { id: newUser.id, email: newUser.email, name: newUser.name }
+      };
+    }
+  },
+
+  async login(input: Record<string, string>): Promise<{ token: string; user: { id: number; email: string; name: string } }> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Login failed");
+      }
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, using local mock login:", err);
+      const users = JSON.parse(localStorage.getItem("mock_users") || "[]");
+      const matched = users.find((u: any) => u.email === input.email && u.password === input.password);
+      if (!matched) {
+        throw new Error("Invalid email or password credentials");
+      }
+      const token = btoa(`${matched.id}:${matched.email}`);
+      return {
+        token,
+        user: { id: matched.id, email: matched.email, name: matched.name }
+      };
+    }
+  },
+
+  async fetchHistory(token: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/history`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("History fetch failed");
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, using local storage history:", err);
+      return JSON.parse(localStorage.getItem("ecotrack_history") || "[]");
+    }
+  },
+
+  async saveHistory(token: string, entry: { date: string; total_emissions: number; eco_score: number; raw_input: AssessmentInput }): Promise<void> {
+    try {
+      await fetch(`${BASE_URL}/api/user/history`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(entry)
+      });
+    } catch (err) {
+      console.warn("Backend unavailable, history saved locally only:", err);
+    }
+  },
+
+  async clearHistory(token: string): Promise<void> {
+    try {
+      await fetch(`${BASE_URL}/api/user/history`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn("Backend unavailable, history cleared locally only:", err);
+    }
   }
 };

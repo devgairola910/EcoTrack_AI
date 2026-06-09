@@ -58,3 +58,28 @@ class SimulationRequest(BaseModel):
     current_assessment: AssessmentRequest
     adopted_recommendations: List[str]  # list of Recommendation IDs
     custom_adjustments: Optional[dict] = None
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: str
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+class HistoryLogEntry(BaseModel):
+    id: int
+    date: str
+    total_emissions: float
+    eco_score: int
+    raw_input: AssessmentRequest
