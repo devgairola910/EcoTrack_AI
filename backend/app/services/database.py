@@ -51,6 +51,24 @@ def init_db():
         FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
+
+    # Create User Challenges table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_challenges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        challenge_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        points INTEGER NOT NULL,
+        co2_saved REAL NOT NULL,
+        status TEXT NOT NULL,
+        start_date TEXT,
+        completed_date TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, challenge_id)
+    )
+    """)
     
     conn.commit()
     conn.close()
@@ -172,5 +190,90 @@ def clear_activities(user_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM activities WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+# --- WEEKLY CHALLENGES OPERATIONS ---
+
+def get_user_challenges(user_id: int) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, challenge_id, title, description, points, co2_saved, status, start_date, completed_date FROM user_challenges WHERE user_id = ?",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    
+    # If no challenges exist, seed them for the user
+    if not rows:
+        default_challenges = [
+            ("zero_waste", "Zero-Waste Hero", "Avoid all single-use plastics for 5 days.", 50, 2.5),
+            ("pedal_power", "Pedal Power", "Commute via bike or walk for at least 15 km.", 80, 12.0),
+            ("power_down", "Power Down", "Unplug all standby electronic appliances before going to sleep.", 40, 3.2),
+            ("green_chef", "Green Chef", "Cook 5 consecutive plant-based lunches or dinners.", 60, 9.5)
+        ]
+        for cid, title, desc, pts, co2 in default_challenges:
+            try:
+                cursor.execute(
+                    "INSERT INTO user_challenges (user_id, challenge_id, title, description, points, co2_saved, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (user_id, cid, title, desc, pts, co2, "available")
+                )
+            except sqlite3.IntegrityError:
+                pass
+        conn.commit()
+        
+        # Refetch
+        cursor.execute(
+            "SELECT id, challenge_id, title, description, points, co2_saved, status, start_date, completed_date FROM user_challenges WHERE user_id = ?",
+            (user_id,)
+        )
+        rows = cursor.fetchall()
+        
+    conn.close()
+    return [dict(r) for r in rows]
+
+def update_user_challenge_status(user_id: int, challenge_id: str, status: str, completed_date: Optional[str] = None) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if challenge exists for user
+    cursor.execute("SELECT id FROM user_challenges WHERE user_id = ? AND challenge_id = ?", (user_id, challenge_id))
+    row = cursor.fetchone()
+    
+    if not row:
+        # Seed challenges first
+        conn.close()
+        get_user_challenges(user_id)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+    import datetime
+    if status == "completed":
+        date_str = completed_date or datetime.date.today().strftime("%Y-%m-%d")
+        cursor.execute(
+            "UPDATE user_challenges SET status = ?, completed_date = ? WHERE user_id = ? AND challenge_id = ?",
+            (status, date_str, user_id, challenge_id)
+        )
+    elif status == "active":
+        date_str = datetime.date.today().strftime("%Y-%m-%d")
+        cursor.execute(
+            "UPDATE user_challenges SET status = ?, start_date = ? WHERE user_id = ? AND challenge_id = ?",
+            (status, date_str, user_id, challenge_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE user_challenges SET status = ? WHERE user_id = ? AND challenge_id = ?",
+            (status, user_id, challenge_id)
+        )
+        
+    conn.commit()
+    rows_affected = cursor.rowcount
+    conn.close()
+    return rows_affected > 0
+
+def clear_user_challenges(user_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_challenges WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()

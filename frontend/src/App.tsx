@@ -7,6 +7,8 @@ import { CarbonCalculator } from "./pages/CarbonCalculator";
 import { Dashboard } from "./pages/Dashboard";
 import { SustainabilitySimulator } from "./pages/SustainabilitySimulator";
 import { Recommendations } from "./pages/Recommendations";
+import { ActivityTracker } from "./pages/ActivityTracker";
+import { WeeklyChallenges } from "./pages/WeeklyChallenges";
 import { AuthModal } from "./components/AuthModal";
 
 const AppContent: React.FC = () => {
@@ -38,6 +40,12 @@ const AppContent: React.FC = () => {
         )}
         {currentPage === "recommendations" && (
           <Recommendations setCurrentPage={setCurrentPage} />
+        )}
+        {currentPage === "tracker" && (
+          <ActivityTracker setCurrentPage={setCurrentPage} />
+        )}
+        {currentPage === "challenges" && (
+          <WeeklyChallenges setCurrentPage={setCurrentPage} />
         )}
       </main>
 

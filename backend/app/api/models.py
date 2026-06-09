@@ -96,3 +96,17 @@ class ActivityResponse(BaseModel):
     action_id: str
     points: int
     co2_saved: float
+
+class ChallengeResponse(BaseModel):
+    id: int
+    challenge_id: str
+    title: str
+    description: str
+    points: int
+    co2_saved: float
+    status: str
+    start_date: Optional[str] = None
+    completed_date: Optional[str] = None
+
+class ChallengeUpdateRequest(BaseModel):
+    status: str

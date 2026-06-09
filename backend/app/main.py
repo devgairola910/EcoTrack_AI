@@ -15,7 +15,11 @@ from app.api.models import (
     LoginRequest,
     AuthResponse,
     UserResponse,
-    HistoryLogEntry
+    HistoryLogEntry,
+    ActivityLogRequest,
+    ActivityResponse,
+    ChallengeResponse,
+    ChallengeUpdateRequest
 )
 from app.services.calculator import calculate_total_emissions
 from app.services.assessment import perform_user_assessment, calculate_eco_score, determine_profile_type
@@ -311,4 +315,78 @@ def delete_user_history_logs(user_id: int = Depends(get_current_user_id)):
     from app.services.database import clear_user_history
     clear_user_history(user_id)
     return {"status": "success", "message": "History cleared"}
+
+# --- ACTIVITY LOGGER ENDPOINTS ---
+
+@app.get("/api/user/activities", response_model=List[ActivityResponse])
+def fetch_user_activities(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import get_activities
+    rows = get_activities(user_id)
+    return [
+        ActivityResponse(
+            id=r["id"],
+            date=r["date"],
+            action_id=r["action_id"],
+            points=r["points"],
+            co2_saved=r["co2_saved"]
+        ) for r in rows
+    ]
+
+@app.post("/api/user/activities")
+def log_user_activity(request: ActivityLogRequest, user_id: int = Depends(get_current_user_id)):
+    from app.services.database import add_activity
+    act_id = add_activity(
+        user_id,
+        request.date,
+        request.action_id,
+        request.points,
+        request.co2_saved
+    )
+    return {"status": "success", "activity_id": act_id}
+
+@app.delete("/api/user/activities/{activity_id}")
+def delete_user_activity(activity_id: int, user_id: int = Depends(get_current_user_id)):
+    from app.services.database import delete_activity
+    delete_activity(user_id, activity_id)
+    return {"status": "success"}
+
+@app.delete("/api/user/activities")
+def clear_user_activities(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import clear_activities
+    clear_activities(user_id)
+    return {"status": "success"}
+
+# --- WEEKLY CHALLENGES ENDPOINTS ---
+
+@app.get("/api/user/challenges", response_model=List[ChallengeResponse])
+def fetch_user_challenges(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import get_user_challenges
+    rows = get_user_challenges(user_id)
+    return [
+        ChallengeResponse(
+            id=r["id"],
+            challenge_id=r["challenge_id"],
+            title=r["title"],
+            description=r["description"],
+            points=r["points"],
+            co2_saved=r["co2_saved"],
+            status=r["status"],
+            start_date=r["start_date"],
+            completed_date=r["completed_date"]
+        ) for r in rows
+    ]
+
+@app.put("/api/user/challenges/{challenge_id}")
+def update_challenge_status(challenge_id: str, request: ChallengeUpdateRequest, user_id: int = Depends(get_current_user_id)):
+    from app.services.database import update_user_challenge_status
+    success = update_user_challenge_status(user_id, challenge_id, request.status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Challenge not found or update failed")
+    return {"status": "success"}
+
+@app.delete("/api/user/challenges")
+def clear_challenges(user_id: int = Depends(get_current_user_id)):
+    from app.services.database import clear_user_challenges
+    clear_user_challenges(user_id)
+    return {"status": "success", "message": "Challenges cleared"}
 

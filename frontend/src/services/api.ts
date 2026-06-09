@@ -72,6 +72,33 @@ export interface SimulationResponse {
   new_profile_type: string;
 }
 
+export interface ActivityLogRequest {
+  action_id: string;
+  points: number;
+  co2_saved: number;
+  date: string;
+}
+
+export interface ActivityResponse {
+  id: number;
+  date: string;
+  action_id: string;
+  points: number;
+  co2_saved: number;
+}
+
+export interface ChallengeResponse {
+  id: number;
+  challenge_id: string;
+  title: string;
+  description: string;
+  points: number;
+  co2_saved: number;
+  status: string;
+  start_date?: string;
+  completed_date?: string;
+}
+
 // Local Fallback Calculations (in case backend is not running)
 const TRANSPORT_FACTORS: Record<string, number> = {
   petrol: 0.192,
@@ -551,6 +578,132 @@ export const api = {
       });
     } catch (err) {
       console.warn("Backend unavailable, history cleared locally only:", err);
+    }
+  },
+
+  async fetchActivities(token: string): Promise<ActivityResponse[]> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/activities`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Activities fetch failed");
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, using local storage activities:", err);
+      return JSON.parse(localStorage.getItem("ecotrack_activities") || "[]");
+    }
+  },
+
+  async logActivity(token: string, entry: ActivityLogRequest): Promise<{ status: string; activity_id?: number }> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/activities`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(entry)
+      });
+      if (!response.ok) throw new Error("Log activity failed");
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, activity saved locally only:", err);
+      const activities = JSON.parse(localStorage.getItem("ecotrack_activities") || "[]");
+      const id = Date.now();
+      const newAct: ActivityResponse = { id, ...entry };
+      activities.unshift(newAct);
+      localStorage.setItem("ecotrack_activities", JSON.stringify(activities));
+      return { status: "success", activity_id: id };
+    }
+  },
+
+  async deleteActivity(token: string, activityId: number): Promise<void> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/activities/${activityId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Delete activity failed");
+    } catch (err) {
+      console.warn("Backend unavailable, activity deleted locally only:", err);
+      let activities = JSON.parse(localStorage.getItem("ecotrack_activities") || "[]");
+      activities = activities.filter((act: ActivityResponse) => act.id !== activityId);
+      localStorage.setItem("ecotrack_activities", JSON.stringify(activities));
+    }
+  },
+
+  async clearActivities(token: string): Promise<void> {
+    try {
+      await fetch(`${BASE_URL}/api/user/activities`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn("Backend unavailable, activities cleared locally only:", err);
+      localStorage.removeItem("ecotrack_activities");
+    }
+  },
+
+  async fetchChallenges(token: string): Promise<ChallengeResponse[]> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/challenges`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Challenges fetch failed");
+      return await response.json();
+    } catch (err) {
+      console.warn("Backend unavailable, using local storage challenges:", err);
+      let challenges = JSON.parse(localStorage.getItem("ecotrack_challenges") || "[]");
+      if (challenges.length === 0) {
+        challenges = [
+          { id: 1, challenge_id: "zero_waste", title: "Zero-Waste Hero", description: "Avoid all single-use plastics for 5 days.", points: 50, co2_saved: 2.5, status: "available" },
+          { id: 2, challenge_id: "pedal_power", title: "Pedal Power", description: "Commute via bike or walk for at least 15 km.", points: 80, co2_saved: 12.0, status: "available" },
+          { id: 3, challenge_id: "power_down", title: "Power Down", description: "Unplug all standby electronic appliances before going to sleep.", points: 40, co2_saved: 3.2, status: "available" },
+          { id: 4, challenge_id: "green_chef", title: "Green Chef", description: "Cook 5 consecutive plant-based lunches or dinners.", points: 60, co2_saved: 9.5, status: "available" }
+        ];
+        localStorage.setItem("ecotrack_challenges", JSON.stringify(challenges));
+      }
+      return challenges;
+    }
+  },
+
+  async updateChallengeStatus(token: string, challengeId: string, status: string): Promise<void> {
+    try {
+      const response = await fetch(`${BASE_URL}/api/user/challenges/${challengeId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      if (!response.ok) throw new Error("Update challenge failed");
+    } catch (err) {
+      console.warn("Backend unavailable, challenge status updated locally only:", err);
+      const challenges = JSON.parse(localStorage.getItem("ecotrack_challenges") || "[]");
+      const matched = challenges.find((c: ChallengeResponse) => c.challenge_id === challengeId);
+      if (matched) {
+        matched.status = status;
+        const today = new Date().toISOString().split("T")[0];
+        if (status === "active") {
+          matched.start_date = today;
+        } else if (status === "completed") {
+          matched.completed_date = today;
+        }
+        localStorage.setItem("ecotrack_challenges", JSON.stringify(challenges));
+      }
+    }
+  },
+
+  async clearChallenges(token: string): Promise<void> {
+    try {
+      await fetch(`${BASE_URL}/api/user/challenges`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn("Backend unavailable, challenges cleared locally only:", err);
+      localStorage.removeItem("ecotrack_challenges");
     }
   }
 };
