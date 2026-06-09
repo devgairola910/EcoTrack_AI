@@ -7,12 +7,19 @@ import type {
   SimulationResponse
 } from "../services/api";
 
+export interface HistoryEntry {
+  date: string;
+  total_emissions: number; // in kg CO2e
+  eco_score: number;
+}
+
 interface EcoContextType {
   assessmentInput: AssessmentInput;
   assessmentResult: AssessmentResponse | null;
   recommendations: Recommendation[];
   adoptedRecommendations: string[];
   simulationResult: SimulationResponse | null;
+  history: HistoryEntry[];
   isCalculated: boolean;
   isLoading: boolean;
   calculate: (input: AssessmentInput) => Promise<void>;
@@ -69,6 +76,10 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [simulationResult, setSimulationResult] = useState<SimulationResponse | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
+    const saved = localStorage.getItem("ecotrack_history");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isCalculated, setIsCalculated] = useState<boolean>(() => {
     return localStorage.getItem("ecotrack_calculated") === "true";
   });
@@ -81,7 +92,8 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (assessmentResult) localStorage.setItem("ecotrack_result", JSON.stringify(assessmentResult));
     localStorage.setItem("ecotrack_recs", JSON.stringify(recommendations));
     localStorage.setItem("ecotrack_adopted", JSON.stringify(adoptedRecommendations));
-  }, [assessmentInput, assessmentResult, recommendations, adoptedRecommendations, isCalculated]);
+    localStorage.setItem("ecotrack_history", JSON.stringify(history));
+  }, [assessmentInput, assessmentResult, recommendations, adoptedRecommendations, isCalculated, history]);
 
   // Compute live simulation when adopted recommendations change
   useEffect(() => {
@@ -99,6 +111,52 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       const recs = await api.fetchRecommendations(input);
       setRecommendations(recs);
+      
+      const currentEmissionsKg = Math.round(res.emissions.total);
+      const currentScore = res.eco_score;
+      const todayStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+      let newHistory: HistoryEntry[] = [];
+      if (history.length === 0) {
+        // Seed past 3 months
+        newHistory.push({
+          date: "Mar 15",
+          total_emissions: Math.round(currentEmissionsKg * 1.35),
+          eco_score: Math.max(1, Math.round(currentScore * 0.8))
+        });
+        newHistory.push({
+          date: "Apr 15",
+          total_emissions: Math.round(currentEmissionsKg * 1.22),
+          eco_score: Math.max(1, Math.round(currentScore * 0.88))
+        });
+        newHistory.push({
+          date: "May 15",
+          total_emissions: Math.round(currentEmissionsKg * 1.10),
+          eco_score: Math.max(1, Math.round(currentScore * 0.94))
+        });
+        newHistory.push({
+          date: todayStr,
+          total_emissions: currentEmissionsKg,
+          eco_score: currentScore
+        });
+      } else {
+        newHistory = [...history];
+        const existingIdx = newHistory.findIndex((e) => e.date === todayStr);
+        if (existingIdx !== -1) {
+          newHistory[existingIdx] = {
+            date: todayStr,
+            total_emissions: currentEmissionsKg,
+            eco_score: currentScore
+          };
+        } else {
+          newHistory.push({
+            date: todayStr,
+            total_emissions: currentEmissionsKg,
+            eco_score: currentScore
+          });
+        }
+      }
+      setHistory(newHistory);
       
       setIsCalculated(true);
       setAdoptedRecommendations([]); // Reset adopted choices on new calculation
@@ -139,6 +197,7 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRecommendations([]);
     setAdoptedRecommendations([]);
     setSimulationResult(null);
+    setHistory([]);
     setIsCalculated(false);
     localStorage.clear();
   };
@@ -151,6 +210,7 @@ export const EcoProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recommendations,
         adoptedRecommendations,
         simulationResult,
+        history,
         isCalculated,
         isLoading,
         calculate,

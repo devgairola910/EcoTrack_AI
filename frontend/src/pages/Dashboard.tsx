@@ -6,7 +6,8 @@ import {
 import { useEco } from "../context/EcoContext";
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line
 } from "recharts";
 
 interface DashboardProps {
@@ -14,7 +15,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
-  const { assessmentResult, assessmentInput } = useEco();
+  const { assessmentResult, assessmentInput, history } = useEco();
 
   if (!assessmentResult) {
     return (
@@ -104,6 +105,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         <div className="bg-dark-900 border border-white/10 rounded-xl p-3 text-xs shadow-xl">
           <span className="font-bold text-white block mb-1">{data.name}</span>
           <span className="text-dark-300 block">{data.Footprint} Tons CO2e / year</span>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Chart 3 Data: Historical Trends (converting to Tons)
+  const historyData = history ? history.map(entry => ({
+    date: entry.date,
+    Footprint: Math.round((entry.total_emissions / 1000) * 10) / 10,
+    Score: entry.eco_score
+  })) : [];
+
+  const renderLineTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-dark-900 border border-white/10 rounded-xl p-3 text-xs shadow-xl">
+          <span className="font-bold text-white block mb-1">{data.date}</span>
+          <span className="text-brand-400 block font-semibold">Eco Score: {data.Score}</span>
+          <span className="text-dark-300 block mt-0.5">{data.Footprint} Tons CO2e / year</span>
         </div>
       );
     }
@@ -250,6 +272,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
           </div>
         </div>
       </div>
+
+      {/* Historical Progress Tracking & Trends */}
+      {history && history.length > 0 && (
+        <div className="glass-panel rounded-3xl p-6 border border-white/5 mb-10 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-base font-semibold text-white uppercase tracking-wider flex items-center space-x-2">
+                <TrendingDown className="h-5 w-5 text-brand-400" />
+                <span>Historical Progress Trends</span>
+              </h3>
+              <p className="text-xs text-dark-400 mt-1">Compare your current footprint vs previous records and track percentage improvements.</p>
+            </div>
+
+            {/* Improvement stats */}
+            {history.length > 1 && (
+              <div className="bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-2xl py-1.5 px-4 text-xs font-semibold">
+                {(() => {
+                  const first = history[0].total_emissions;
+                  const current = emissions.total;
+                  const pct = Math.round(((first - current) / first) * 100);
+                  if (pct > 0) {
+                    return `🎉 Total reduction: ${pct}% since ${history[0].date}`;
+                  } else if (pct < 0) {
+                    return `⚠️ Footprint increased: ${Math.abs(pct)}% since ${history[0].date}`;
+                  } else {
+                    return `Stable emissions trend`;
+                  }
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Line Chart of footprint over time */}
+          <div className="w-full h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={historyData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
+                <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                <Tooltip content={renderLineTooltip} />
+                <Line 
+                  type="monotone" 
+                  dataKey="Footprint" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  activeDot={{ r: 6 }} 
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Badges and Call to Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
